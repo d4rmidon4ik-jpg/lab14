@@ -1,0 +1,76 @@
+version: "3.9"
+
+networks:
+  pipeline-net:
+    driver: bridge
+
+services:
+  # etcd для координации сборщиков (задание 1)
+  etcd:
+    image: bitnami/etcd:3.5
+    container_name: etcd
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+    ports:
+      - "2379:2379"
+    networks:
+      - pipeline-net
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Go сборщик (Arrow Flight RPC сервер)
+  collector:
+    build:
+      context: ./collector
+      dockerfile: Dockerfile
+    container_name: collector
+    ports:
+      - "8815:8815"   # Arrow Flight RPC
+      - "9090:9090"   # метрики
+    environment:
+      - ETCD_URL=http://etcd:2379
+      - SHARD_ID=1
+      - WINDOW_SIZE=10
+    networks:
+      - pipeline-net
+    depends_on:
+      etcd:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Второй экземпляр сборщика (задание 1 — распределённый)
+  collector-2:
+    build:
+      context: ./collector
+      dockerfile: Dockerfile
+    container_name: collector-2
+    ports:
+      - "8816:8815"
+      - "9091:9090"
+    environment:
+      - ETCD_URL=http://etcd:2379
+      - SHARD_ID=2
+      - WINDOW_SIZE=10
+    networks:
+      - pipeline-net
+    depends_on:
+      etcd:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Дашборд
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: dashboard
+    ports:
+      - "8000:8000"
+    networks:
+      - pipeline-net
+    restart: unless-stopped
