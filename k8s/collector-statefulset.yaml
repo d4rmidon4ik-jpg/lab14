@@ -1,10 +1,9 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: collector
-  labels:
-    app: collector
 spec:
+  serviceName: collector-service
   replicas: 2
   selector:
     matchLabels:
@@ -20,16 +19,18 @@ spec:
           imagePullPolicy: Never
           ports:
             - containerPort: 8815
-              name: arrow
             - containerPort: 9090
-              name: metrics
           env:
             - name: ETCD_URL
               value: "http://etcd-service:2379"
             - name: WINDOW_SIZE
               value: "10"
-            - name: SHARD_ID
-              value: "1"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          # collector-0 → SHARD_ID=0, collector-1 → SHARD_ID=1
+          # В main.go парсить из POD_NAME: strings.Split(name, "-")[1]
           resources:
             requests:
               cpu: "100m"
