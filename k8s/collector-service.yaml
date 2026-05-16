@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector-service
+spec:
+  selector:
+    app: collector
+  ports:
+    - name: arrow
+      port: 8815
+      targetPort: 8815
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+  type: ClusterIP

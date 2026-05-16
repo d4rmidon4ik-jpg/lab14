@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+  labels:
+    app: collector
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: collector
+  template:
+    metadata:
+      labels:
+        app: collector
+    spec:
+      containers:
+        - name: collector
+          image: lab14-collector:latest
+          imagePullPolicy: Never  # для minikube
+          ports:
+            - containerPort: 8815
+              name: arrow
+            - containerPort: 9090
+              name: metrics
+          env:
+            - name: ETCD_URL
+              value: "http://etcd-service:2379"
+            - name: WINDOW_SIZE
+              value: "10"
+            - name: SHARD_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name  # уникальный ID из имени пода
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
