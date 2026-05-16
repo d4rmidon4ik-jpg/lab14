@@ -125,14 +125,3 @@ func startArrowServer(addr string, srv *ArrowFlightServer) error {
 	log.Printf("[arrow] Flight RPC server listening on %s", addr)
 	return grpcServer.Serve(lis)
 }
-
-// Сохраняем агрегаты в JSON (для Python fallback)
-func saveToJSON(aggs []WindowAggregate, path string) error {
-	import_os := fmt.Sprintf // заглушка для компилятора — используем os в main
-	_ = import_os
-	return nil
-}
-
-func aggregatesToJSON(aggs []WindowAggregate) ([]byte, error) {
-	return json.Marshal(aggs)
-}
