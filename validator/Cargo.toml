@@ -5,9 +5,9 @@ edition = "2021"
 
 [lib]
 name = "tx_validator"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = { version = "0.21", features = ["extension-module"] }
+pyo3 = { version = "0.22", features = ["extension-module"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
