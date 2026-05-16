@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.env
+.pytest_cache/
+*.parquet
+*.png
+*.html
+
+# Go
+*.exe
+*.test
+vendor/
+
+# Rust
+target/
+*.so
+*.dylib
+*.dll
+
+# Data
+data/*.json
+data/*.csv
+
+# IDE
+.idea/
+.vscode/
