@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Financial Transactions Monitor</title>
+    <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Courier New', monospace; background: #0d1117; color: #c9d1d9; }
+        header { background: #161b22; padding: 16px 24px; border-bottom: 1px solid #30363d; }
+        header h1 { color: #58a6ff; font-size: 20px; }
+        .status { float: right; font-size: 12px; }
+        .status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3fb950; margin-right: 4px; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 24px; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+        .card .label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; }
+        .card .value { font-size: 28px; font-weight: bold; color: #58a6ff; margin-top: 4px; }
+        .card .sub { font-size: 11px; color: #8b949e; margin-top: 2px; }
+        .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 24px 24px; }
+        .chart-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+        .chart-box h3 { color: #8b949e; font-size: 12px; margin-bottom: 12px; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { background: #21262d; padding: 8px; text-align: left; color: #8b949e; }
+        td { padding: 6px 8px; border-bottom: 1px solid #21262d; }
+        .badge-success { color: #3fb950; }
+        .badge-failed { color: #f85149; }
+        footer { padding: 16px 24px; color: #8b949e; font-size: 11px; border-top: 1px solid #30363d; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>💳 Financial Transaction Monitor</h1>
+    <div class="status"><span class="dot"></span> Live — обновление каждые 2с</div>
+</header>
+
+<div class="grid">
+    <div class="card">
+        <div class="label">Транзакций/окно</div>
+        <div class="value" id="avg-count">—</div>
+        <div class="sub">среднее за окно</div>
+    </div>
+    <div class="card">
+        <div class="label">Объём/окно</div>
+        <div class="value" id="avg-volume">—</div>
+        <div class="sub">средний RUB</div>
+    </div>
+    <div class="card">
+        <div class="label">Успешность</div>
+        <div class="value" id="success-rate">—</div>
+        <div class="sub">% успешных</div>
+    </div>
+    <div class="card">
+        <div class="label">Активных шардов</div>
+        <div class="value" id="shards">—</div>
+        <div class="sub">сборщиков</div>
+    </div>
+</div>
+
+<div class="charts">
+    <div class="chart-box">
+        <h3>Объём по валютам</h3>
+        <div id="chart-currency" style="height:250px;"></div>
+    </div>
+    <div class="chart-box">
+        <h3>Успешность во времени</h3>
+        <div id="chart-timeline" style="height:250px;"></div>
+    </div>
+    <div class="chart-box" style="grid-column: span 2;">
+        <h3>Последние окна агрегации</h3>
+        <table id="recent-table">
+            <thead>
+                <tr>
+                    <th>Время</th><th>Shard</th><th>Транзакций</th>
+                    <th>Объём</th><th>Валюта</th>
+                    <th>Успешных %</th><th>Ошибок</th>
+                </tr>
+            </thead>
+            <tbody id="recent-rows"></tbody>
+        </table>
+    </div>
+</div>
+
+<footer>
+    Вариант 24 — Мониторинг финансовых транзакций | ЛР №14
+</footer>
+
+<script>
+    const ws = new WebSocket(`ws://${location.host}/ws`);
+    let allData = [];
+
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'update') {
+            allData = msg.data;
+            render(msg.stats, msg.data);
+        }
+    };
+
+    ws.onclose = () => {
+        document.querySelector('.dot').style.background = '#f85149';
+    };
+
+    function fmt(n) {
+        return new Intl.NumberFormat('ru-RU').format(Math.round(n));
+    }
+
+    function render(stats, data) {
+        // Карточки
+        document.getElementById('avg-count').textContent = fmt(stats.avg_count);
+        document.getElementById('avg-volume').textContent = fmt(stats.avg_volume);
+        document.getElementById('success-rate').textContent = stats.success_rate.toFixed(1) + '%';
+        document.getElementById('shards').textContent = stats.shards;
+
+        // График по валютам
+        const byCur = {};
+        data.forEach(d => {
+            byCur[d.currency] = (byCur[d.currency] || 0) + d.total_amount;
+        });
+        Plotly.newPlot('chart-currency', [{
+            type: 'bar',
+            x: Object.keys(byCur),
+            y: Object.values(byCur),
+            marker: { color: '#58a6ff' }
+        }], {
+            paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+            font: { color: '#c9d1d9', size: 11 },
+            margin: { t: 10, b: 30, l: 40, r: 10 },
+            xaxis: { gridcolor: '#21262d' }, yaxis: { gridcolor: '#21262d' }
+        }, { displayModeBar: false });
+
+        // Timeline успешности
+        const sorted = [...data].sort((a, b) => a.window_start < b.window_start ? -1 : 1);
+        Plotly.newPlot('chart-timeline', [{
+            type: 'scatter', mode: 'lines+markers',
+            x: sorted.map(d => d.window_start),
+            y: sorted.map(d => d.success_rate),
+            line: { color: '#3fb950' }, marker: { size: 4 }
+        }], {
+            paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+            font: { color: '#c9d1d9', size: 11 },
+            margin: { t: 10, b: 30, l: 40, r: 10 },
+            xaxis: { gridcolor: '#21262d' }, yaxis: { gridcolor: '#21262d', range: [0, 105] }
+        }, { displayModeBar: false });
+
+        // Таблица последних записей
+        const rows = [...data].sort((a, b) => b.window_start > a.window_start ? 1 : -1).slice(0, 10);
+        const tbody = document.getElementById('recent-rows');
+        tbody.innerHTML = rows.map(r => `
+            <tr>
+                <td>${r.window_start ? r.window_start.substring(0, 19) : '—'}</td>
+                <td>${r.shard_id}</td>
+                <td>${fmt(r.total_count)}</td>
+                <td>${fmt(r.total_amount)}</td>
+                <td>${r.currency}</td>
+                <td class="${r.success_rate > 80 ? 'badge-success' : 'badge-failed'}">${(r.success_rate || 0).toFixed(1)}%</td>
+                <td class="badge-failed">${r.failed_count}</td>
+            </tr>`).join('');
+    }
+</script>
+</body>
+</html>
