@@ -23,6 +23,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # NATS брокер (задание 7 — потоковая передача)
+  nats:
+    image: nats:2.10-alpine
+    container_name: nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - pipeline-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   # Go сборщик (Arrow Flight RPC сервер)
   collector:
     build:
@@ -34,12 +49,15 @@ services:
       - "9090:9090"   # метрики
     environment:
       - ETCD_URL=http://etcd:2379
+      - NATS_URL=nats://nats:4222
       - SHARD_ID=1
       - WINDOW_SIZE=10
     networks:
       - pipeline-net
     depends_on:
       etcd:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     restart: unless-stopped
 
@@ -54,12 +72,30 @@ services:
       - "9091:9090"
     environment:
       - ETCD_URL=http://etcd:2379
+      - NATS_URL=nats://nats:4222
       - SHARD_ID=2
       - WINDOW_SIZE=10
     networks:
       - pipeline-net
     depends_on:
       etcd:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Python NATS консьюмер (задание 7 — скользящее окно)
+  nats-consumer:
+    build:
+      context: ./streaming
+      dockerfile: Dockerfile
+    container_name: nats-consumer
+    environment:
+      - NATS_URL=nats://nats:4222
+    networks:
+      - pipeline-net
+    depends_on:
+      nats:
         condition: service_healthy
     restart: unless-stopped
 
